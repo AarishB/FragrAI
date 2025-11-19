@@ -4,7 +4,6 @@ import { getRecommendations } from "./lib/api";
 import { Layout } from "./Components/Layout";
 import { PreferencesForm } from "./Components/PreferencesForm";
 import { ResultsPanel } from "./Components/ResultsPanel";
-import { FragranceCard } from "./Components/FragranceCard";
 
 const App: React.FC = () => {
   const [form, setForm] = useState<FormState>({
@@ -58,25 +57,7 @@ const App: React.FC = () => {
           ⚠️ {error}
         </div>
       )}
-            {/* Temporary demo section for your own fragrances */}
-      <section className="mt-10 space-y-4">
-        <h2 className="text-xl font-semibold text-slate-100">
-          Sample fragrance card
-        </h2>
-        <p className="text-sm text-slate-400">
-          This is just a demo of how your own collection could look. Later you
-          can map over an array of all your bottles.
-        </p>
-
-        <FragranceCard
-          name="Acqua di Giò Parfum"
-          brand="Armani"
-          season="summer"
-          notes={["aquatic", "citrus", "woody"]}
-          price={135}
-          sizeMl={75}
-        />
-      </section>
+            
     </Layout>
   );
 };
