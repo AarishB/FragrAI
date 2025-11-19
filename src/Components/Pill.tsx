@@ -8,11 +8,14 @@ export const Pill: React.FC<{
   <button
     type="button"
     onClick={onClick}
-    className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-all duration-200 capitalize ${
+    className={`px-3.5 py-1.5 rounded-md border text-[11px] uppercase tracking-wide transition-all duration-200 ${
       active
-        ? "bg-emerald-500 text-slate-950 border-emerald-500 shadow-lg shadow-emerald-500/30 scale-105"
-        : "bg-slate-800/50 text-slate-300 border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800 hover:text-emerald-400 hover:scale-105"
+        ? // ACTIVE STATE — gold accent, warm black background
+          "border-[#c19a6b] bg-[#3a2a1f] text-[#f5f0e9] shadow-[0_0_12px_rgba(193,154,107,0.25)] scale-[1.02]"
+        : // INACTIVE STATE — matte black, subtle label look
+          "border-[#3a2d22] bg-[#17120e] text-[#b8ad99] hover:border-[#c19a6b]/70 hover:text-[#f5f0e9] hover:scale-[1.03]"
     }`}
+    style={{ fontFamily: "Inter, sans-serif" }}
   >
     {children}
   </button>
