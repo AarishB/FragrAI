@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# ML/data files that don't belong in the React repo
+*.csv
+*.ipynb
+*.code-workspace
+
 # Environment variables
 .env
 .env.local
