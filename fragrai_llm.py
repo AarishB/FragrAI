@@ -14,7 +14,7 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    print("⚠️  OpenAI not available, will use fallback mode")
+    print("Note: OpenAI not available, will use fallback mode")
 
 
 # === KNOWN FRAGRANCES → their core notes ===
@@ -217,7 +217,7 @@ def compute_and_cache_embeddings(
 
     np.savez_compressed(cache_path, embeddings=emb_array, indices=idx_array)
     mb = emb_array.nbytes / 1024 ** 2
-    print(f"✅ Embeddings cached → {cache_path}  ({emb_array.shape}, {mb:.1f} MB)")
+    print(f"Embeddings cached: {cache_path}  ({emb_array.shape}, {mb:.1f} MB)")
     return emb_array
 
 
@@ -371,12 +371,12 @@ Return ONLY valid JSON (no markdown):
 }}"""
 
     if not OPENAI_AVAILABLE:
-        print("⚠️  OpenAI library not installed — using enhanced fallback")
+        print("Note: OpenAI library not installed — using enhanced fallback")
         return fallback_note_extraction(user_answers)
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key or not api_key.startswith("sk-"):
-        print("❌ OpenAI API key missing or invalid — using enhanced fallback")
+        print("Warning: OpenAI API key missing or invalid — using enhanced fallback")
         return fallback_note_extraction(user_answers)
 
     fresh_client = OpenAI(api_key=api_key)
@@ -403,7 +403,7 @@ Return ONLY valid JSON (no markdown):
         valid_notes = [n.lower() for n in result.get("notes", []) if n.lower() in vocab_lower]
 
         if not valid_notes:
-            print("⚠️  GPT returned no valid vocabulary notes — using enhanced fallback")
+            print("Note: GPT returned no valid vocabulary notes — using enhanced fallback")
             return fallback_note_extraction(user_answers)
 
         print("   Scent profile extracted.")
@@ -418,11 +418,11 @@ Return ONLY valid JSON (no markdown):
         }
 
     except json.JSONDecodeError as e:
-        print(f"❌ GPT response not valid JSON: {e}")
+        print(f"Error: GPT response not valid JSON: {e}")
         return fallback_note_extraction(user_answers)
 
     except Exception as e:
-        print(f"❌ LLM API call failed: {type(e).__name__}: {e}")
+        print(f"Error: LLM API call failed: {type(e).__name__}: {e}")
         return fallback_note_extraction(user_answers)
 
 
@@ -438,7 +438,7 @@ def fallback_note_extraction(user_answers: Dict) -> Dict:
     for frag_name, frag_notes in KNOWN_FRAGRANCES.items():
         if frag_name in desc_lower:
             found_notes.extend(frag_notes)
-            print(f"   📌 Detected reference: '{frag_name}' → {frag_notes[:4]}")
+            print(f"   Detected reference: '{frag_name}' -> {frag_notes[:4]}")
 
     for trait, notes in TRAIT_NOTE_MAPPINGS.items():
         if trait in desc_lower:

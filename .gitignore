@@ -14,7 +14,6 @@ dist-ssr
 
 # ML/data files that don't belong in the React repo
 *.csv
-*.ipynb
 *.code-workspace
 
 # Large ML cache/model files
