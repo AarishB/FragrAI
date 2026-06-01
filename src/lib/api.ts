@@ -1,5 +1,5 @@
 // src/lib/api.ts
-import type { FormState, Rec } from "./types";
+import type { FormState, Rec, Dupe } from "./types";
 import { mockPredict } from "./mockPredict";
 
 const API_URL = import.meta.env.VITE_API_URL as string | undefined;
@@ -51,7 +51,31 @@ function toRecs(data: any): Rec[] {
     match:  parseFloat(r.match_score) / 100,
     season: "any" as const,
     notes:  r.notes ?? [],
+    dupes:  (r.dupes ?? []).map((d: any): Dupe => ({
+      name:      d.name      ?? "",
+      designer:  d.designer  ?? "",
+      price_usd: d.price_usd ?? "",
+      reason:    d.reason    ?? "",
+    })),
   }));
+}
+
+export async function sendFeedback(
+  rec: Rec,
+  liked: boolean,
+  userDescription: string
+): Promise<void> {
+  if (!API_URL) return; // no-op in mock mode
+  await fetch(`${API_URL}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fragrance_name:   rec.name,
+      designer:         rec.brand,
+      liked,
+      user_description: userDescription,
+    }),
+  }).catch(() => {}); // fire-and-forget, never block the UI
 }
 
 export async function getRecommendations(form: FormState): Promise<Rec[]> {

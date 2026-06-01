@@ -55,6 +55,13 @@ export interface FormState {
   complexity?: number; // 0–100 (simple ↔ complex)
 }
 
+export interface Dupe {
+  name: string;
+  designer: string;
+  price_usd: string;
+  reason: string;
+}
+
 export interface Rec {
   id: string;
   name: string;
@@ -63,6 +70,7 @@ export interface Rec {
   season: Season;
   notes: Note[];
   url?: string;
+  dupes?: Dupe[];
 }
 
 export interface User {

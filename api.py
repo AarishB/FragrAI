@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import OneHotEncoder
 from typing import Optional
+import json
+import threading
 
 load_dotenv()
 
@@ -178,8 +180,76 @@ PERSONALITY_NOTES = {
 
 print("  Ready.\n")
 
+# ── Budget filtering ──────────────────────────────────────────────────────────
+
+# Brands that almost always cost $200+
+_ULTRA_LUXURY = {
+    'creed', 'xerjoff', 'roja', 'roja parfums', 'clive christian',
+    'amouage', 'bond no. 9', 'fueguia 1833',
+}
+# Brands typically $100-$200
+_LUXURY = {
+    'tom ford', 'maison margiela', 'byredo', 'le labo', 'diptyque',
+    'maison francis kurkdjian', 'initio', 'parfums de marly', 'nishane',
+    'serge lutens', 'frederic malle', 'memo paris', 'penhaligon',
+    'acqua di parma', 'jo malone', 'orto parisi', 'histoires de parfums',
+}
+# Brands typically $80-$150
+_DESIGNER = {
+    'chanel', 'dior', 'yves saint laurent', 'hermès', 'hermes', 'prada',
+    'gucci', 'versace', 'armani', 'burberry', 'dolce', 'gabbana', 'givenchy',
+    'bvlgari', 'valentino', 'bottega veneta', 'lancome', 'cartier',
+    'marc jacobs', 'balenciaga', 'loewe',
+}
+
+def _filter_by_budget(df_in: pd.DataFrame, budget_str: str) -> pd.DataFrame:
+    bl = budget_str.lower()
+    if bl in ('$200+', 'no limit', ''):
+        return df_in
+    designers = df_in['designer'].str.lower().fillna('')
+    if bl == 'under $50':
+        exclude = _ULTRA_LUXURY | _LUXURY | _DESIGNER
+    elif bl == '$50-$100':
+        exclude = _ULTRA_LUXURY | _LUXURY
+    else:  # $100-$200
+        exclude = _ULTRA_LUXURY
+    mask = designers.apply(lambda d: not any(brand in d for brand in exclude))
+    filtered = df_in[mask]
+    return filtered if len(filtered) >= 50 else df_in  # fallback if too few results
+
 # ── Import the recommendation engine ─────────────────────────────────────────
 from fragrai_llm import get_llm_enhanced_recommendations, enrich_recommendation_with_gpt
+
+# ── Enrichment cache (persisted to disk) ─────────────────────────────────────
+ENRICH_CACHE_PATH = BASE_DIR / "enrichment_cache.json"
+_enrich_lock = threading.Lock()
+
+def _load_enrich_cache() -> dict:
+    if ENRICH_CACHE_PATH.exists():
+        try:
+            return json.loads(ENRICH_CACHE_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+def _save_enrich_cache(cache: dict):
+    ENRICH_CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+
+enrich_cache = _load_enrich_cache()
+print(f"  Enrichment cache: {len(enrich_cache)} fragrances pre-enriched")
+
+
+def get_enriched(row, api_key: str) -> dict:
+    """Return cached enrichment or call GPT and cache the result."""
+    key = f"{row.get('title', '')}|{row.get('designer', '')}"
+    with _enrich_lock:
+        if key in enrich_cache:
+            return enrich_cache[key]
+    enriched = enrich_recommendation_with_gpt(row, api_key)
+    with _enrich_lock:
+        enrich_cache[key] = enriched
+        _save_enrich_cache(enrich_cache)
+    return enriched
 
 # ── FastAPI app ───────────────────────────────────────────────────────────────
 
@@ -205,7 +275,7 @@ class RecommendRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "fragrances_loaded": len(df)}
+    return {"status": "ok", "fragrances_loaded": len(df), "enrichment_cached": len(enrich_cache)}
 
 
 @app.post("/recommend")
@@ -219,10 +289,12 @@ def recommend(req: RecommendRequest):
         "description": req.description,
     }
 
+    df_filtered = _filter_by_budget(df, req.budget)
+
     try:
         results, extraction_info = get_llm_enhanced_recommendations(
             user_answers=user_answers,
-            df=df,
+            df=df_filtered,
             tfidf=tfidf,
             X_tfidf=X_tfidf,
             scent_vocabulary=scent_vocabulary,
@@ -251,7 +323,7 @@ def recommend(req: RecommendRequest):
 
         if req.enrich and api_key:
             try:
-                enriched = enrich_recommendation_with_gpt(row, api_key)
+                enriched = get_enriched(row, api_key)
                 rec["longevity"] = enriched.get("longevity", rec["longevity"])
                 rec["price"]     = enriched.get("price_usd", rec["price"])
                 rec["analysis"]  = enriched.get("notes_analysis", "")
@@ -270,3 +342,36 @@ def recommend(req: RecommendRequest):
             "reasoning":      extraction_info.get("reasoning", ""),
         }
     }
+
+
+# ── Feedback ──────────────────────────────────────────────────────────────────
+
+FEEDBACK_PATH = BASE_DIR / "feedback_log.json"
+_feedback_lock = threading.Lock()
+
+
+class FeedbackRequest(BaseModel):
+    fragrance_name: str
+    designer: str
+    liked: bool          # True = thumbs up, False = thumbs down
+    user_description: str = ""
+
+
+@app.post("/feedback")
+def feedback(req: FeedbackRequest):
+    entry = {
+        "fragrance_name":   req.fragrance_name,
+        "designer":         req.designer,
+        "liked":            req.liked,
+        "user_description": req.user_description,
+    }
+    with _feedback_lock:
+        log = []
+        if FEEDBACK_PATH.exists():
+            try:
+                log = json.loads(FEEDBACK_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                log = []
+        log.append(entry)
+        FEEDBACK_PATH.write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "ok", "total_feedback": len(log)}

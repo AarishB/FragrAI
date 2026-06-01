@@ -157,6 +157,7 @@ const App: React.FC = () => {
               onToggleLike={onToggleLike}
               isLoggedIn={!!session}
               onReset={() => setRecs(null)}
+              userDescription={form.notes.join(", ")}
             />
           </div>
           {error && (
